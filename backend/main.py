@@ -36,6 +36,12 @@ CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", 3600))  # 1 hour def
 
 app = FastAPI(title="Album Recommendations API")
 
+
+@app.exception_handler(RuntimeError)
+async def runtime_error_handler(request, exc: RuntimeError):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN != "*" else ["*"],
@@ -61,6 +67,14 @@ def fetch_data() -> pd.DataFrame:
         "id, title, mbid, release_year, avg_length, rating"
     ).execute()
     albums_df = pd.DataFrame(albums_resp.data)
+
+    if albums_df.empty:
+        raise RuntimeError(
+            "Supabase returned zero rows for 'albums'. This usually means "
+            "Row Level Security is enabled without a SELECT policy for the "
+            "key in use — check Supabase RLS policies on albums / album_tags "
+            "/ tags / album_contributions / artists."
+        )
 
     tags_resp = (
         supabase.table("album_tags").select("album_id, tags(name)").execute()
