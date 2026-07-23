@@ -336,7 +336,7 @@
       <div class="drawer-face">
         <div class="search-row">
           <input id="search" type="text" placeholder="e.g. Nah, I'm Good by BigBallerChris" autocomplete="off" />
-          <button id="go">File a request</button>
+          <button id="go">Find similar albums!</button>
           <div id="suggest" class="suggest"></div>
         </div>
       </div>
@@ -450,7 +450,7 @@
         if (data.suggestions && data.suggestions.length) {
           setStatus(`Not in the library yet. Did you mean: ${data.suggestions.join(', ')}?`, true);
         } else {
-          setStatus(`"${title}" isn't in the library yet.`, true);
+          setStatus(`That album isn't in the database.`, true);
         }
         return;
       }
