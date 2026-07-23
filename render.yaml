@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: album-recs-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ADMIN_REFRESH_TOKEN
+        sync: false
+      - key: CACHE_TTL_SECONDS
+        value: "3600"

@@ -8,17 +8,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #ddd0af;
-    --paper-deep: #cabd99;
-    --card: #f2ead4;
-    --card-line: #d8c9a3;
-    --ink: #241f16;
-    --ink-soft: #56503f;
-    --stamp: #9c3b2c;
-    --stamp-soft: rgba(156,59,44,0.08);
-    --tab: #2e4256;
-    --tab-tint: #e7ecf1;
-    --gold: #a9822f;
+    --paper: #9CB080;
+    --paper-deep: #7fa068;
+    --card: #F8FAF3;
+    --card-line: #DCE6D1;
+    --ink: #273338;
+    --ink-soft: #52625c;
+    --stamp: #618764;
+    --stamp-soft: rgba(97,135,100,0.12);
+    --tab: #2B5748;
+    --tab-tint: #E8F1E3;
+    --accent: #618764;
   }
 
   * { box-sizing: border-box; }
@@ -109,7 +109,7 @@
     border-radius: 4px;
     outline: none;
   }
-  input#search:focus { border-color: var(--gold); }
+  input#search:focus { border-color: var(--accent); }
 
   button#go {
     font-family: 'IBM Plex Mono', monospace;
@@ -117,7 +117,7 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     background: var(--stamp);
-    color: #f2ead4;
+    color: #F8FAF3;
     border: none;
     padding: 0 22px;
     border-radius: 4px;
@@ -146,7 +146,7 @@
     padding: 9px 14px;
     font-size: 14px;
     cursor: pointer;
-    border-bottom: 1px solid #efe6cf;
+    border-bottom: 1px solid #eaf0e3;
   }
   .suggest div:last-child { border-bottom: none; }
   .suggest div:hover { background: var(--stamp-soft); }
@@ -234,7 +234,7 @@
 
   .stamp {
     position: absolute;
-    top: 12px; right: 10px;
+    top: 10px; right: 10px;
     border: 2px solid var(--stamp);
     color: var(--stamp);
     font-size: 11px;
@@ -242,16 +242,40 @@
     padding: 3px 8px;
     border-radius: 4px;
     transform: rotate(6deg);
-    opacity: 0.88;
-    background: rgba(255,255,255,0.4);
+    opacity: 0.92;
+    background: rgba(248,250,243,0.9);
     white-space: nowrap;
+    z-index: 2;
   }
+
+  .cover {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    margin: 30px 0 12px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--tab);
+    position: relative;
+    box-shadow: 0 6px 14px -8px rgba(0,0,0,0.4);
+  }
+  .cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .cover.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cover.placeholder svg { width: 46%; height: 46%; opacity: 0.55; }
 
   .card h3 {
     font-family: 'Fraunces', serif;
     font-size: 19px;
     font-weight: 600;
-    margin: 30px 0 2px;
+    margin: 0 0 2px;
     line-height: 1.25;
   }
 
@@ -304,18 +328,17 @@
     <header>
       <div class="eyebrow">A Personal Library, Cross&#8209;Referenced</div>
       <h1>The Catalog</h1>
-      <p>Type in an album you already like. I'll pull the closest matches from my own shelves — same tags, same collaborators, same era.</p>
+      <p>Type in an album you love.</p>
     </header>
 
     <div class="drawer">
-      <div class="drawer-label">Drawer — Search by Title</div>
+      <div class="drawer-label">Search by Title</div>
       <div class="drawer-face">
         <div class="search-row">
-          <input id="search" type="text" placeholder="e.g. In Rainbows" autocomplete="off" />
+          <input id="search" type="text" placeholder="e.g. Nah, I'm Good by BigBallerChris" autocomplete="off" />
           <button id="go">File a request</button>
           <div id="suggest" class="suggest"></div>
         </div>
-        <div class="hint">Start typing for a card index of everything in the library.</div>
       </div>
     </div>
 
@@ -333,8 +356,14 @@
   </div>
 
 <script>
-  // Point this at your deployed FastAPI backend.
-  const API_BASE = window.ALBUM_API_BASE || "http://localhost:8000";
+  // ── Point this at your deployed FastAPI backend ──────────────────────────
+  // This is the #1 thing to set after deploying — without it, the search box
+  // looks "broken" (silently empty) because it's still trying to reach your
+  // local machine instead of your live Render URL.
+  //
+  //   const API_BASE = "https://your-backend.onrender.com";
+  //
+  const API_BASE = window.ALBUM_API_BASE || "https://your-backend.onrender.com";
 
   const searchInput = document.getElementById('search');
   const suggestBox = document.getElementById('suggest');
@@ -346,14 +375,31 @@
   const cardsEl = document.getElementById('cards');
 
   let allTitles = [];
+  let titlesLoaded = false;
 
-  async function loadTitles() {
+  // Render's free tier spins down after 15 min idle — the first request can
+  // take 30-60s to wake it back up. Retry a few times with backoff instead
+  // of failing silently on the first attempt.
+  async function loadTitles(attempt = 1) {
+    if (API_BASE.includes('your-backend')) {
+      setStatus('Backend URL not set yet — edit API_BASE at the top of the <script> tag in index.html.', true);
+      return;
+    }
+    if (attempt === 1) setStatus('Waking up the library…');
     try {
       const res = await fetch(`${API_BASE}/api/albums`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       allTitles = data.titles || [];
+      titlesLoaded = true;
+      setStatus('');
     } catch (e) {
       console.error('Could not load album list', e);
+      if (attempt < 4) {
+        setTimeout(() => loadTitles(attempt + 1), attempt * 4000);
+      } else {
+        setStatus('Could not reach the backend. Double-check API_BASE in index.html and that your Render service is deployed.', true);
+      }
     }
   }
 
@@ -423,7 +469,10 @@
     cardsEl.innerHTML = data.results.map((r, i) => `
       <div class="card" style="animation-delay:${i * 60}ms">
         <div class="card-index">No. ${String(i + 1).padStart(2, '0')}</div>
-        <div class="stamp">${Math.round(r.similarity * 100)}% match</div>
+        <div class="cover ${r.cover_url ? '' : 'placeholder'}">
+          ${r.cover_url ? `<img src="${r.cover_url}" alt="${escapeHtml(r.title)} cover" loading="lazy" onerror="this.parentElement.classList.add('placeholder'); this.remove();" />` : sleeveSvg()}
+          <div class="stamp">${Math.round(r.similarity * 100)}% match</div>
+        </div>
         <h3>${escapeHtml(r.title)}</h3>
         <div class="artist">${escapeHtml(r.artist_names || 'Unknown artist')}</div>
         <div class="meta-row">
@@ -436,6 +485,17 @@
       </div>
     `).join('');
     resultsSection.style.display = 'block';
+  }
+
+  function sleeveSvg() {
+    return `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="42" fill="#273338" opacity="0.9"/>
+      <circle cx="50" cy="50" r="42" fill="none" stroke="#9CB080" stroke-width="1" opacity="0.6"/>
+      <circle cx="50" cy="50" r="30" fill="none" stroke="#9CB080" stroke-width="0.6" opacity="0.45"/>
+      <circle cx="50" cy="50" r="18" fill="none" stroke="#9CB080" stroke-width="0.6" opacity="0.45"/>
+      <circle cx="50" cy="50" r="7" fill="#F8FAF3"/>
+      <circle cx="50" cy="50" r="2" fill="#273338"/>
+    </svg>`;
   }
 
   function escapeHtml(str) {
