@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Catalog — Album Recommendations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #ddd0af;
+    --paper-deep: #cabd99;
+    --card: #f2ead4;
+    --card-line: #d8c9a3;
+    --ink: #241f16;
+    --ink-soft: #56503f;
+    --stamp: #9c3b2c;
+    --stamp-soft: rgba(156,59,44,0.08);
+    --tab: #2e4256;
+    --tab-tint: #e7ecf1;
+    --gold: #a9822f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image:
+      radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px);
+    background-size: 3px 3px;
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    padding: 0 20px 80px;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header {
+    padding: 56px 0 28px;
+    text-align: center;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 56px);
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    color: var(--ink-soft);
+    font-size: 14px;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* ── Search drawer ─────────────────────────────────────────────── */
+
+  .drawer {
+    position: relative;
+    background: var(--tab);
+    border-radius: 10px 10px 4px 4px;
+    padding: 6px 6px 0;
+    box-shadow: 0 14px 26px -14px rgba(0,0,0,0.45);
+  }
+
+  .drawer-label {
+    color: var(--tab-tint);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 8px 14px 10px;
+    opacity: 0.75;
+  }
+
+  .drawer-face {
+    background: var(--card);
+    border-radius: 6px 6px 2px 2px;
+    padding: 18px;
+    position: relative;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 10px;
+    position: relative;
+  }
+
+  input#search {
+    flex: 1;
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--card-line);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 4px;
+    outline: none;
+  }
+  input#search:focus { border-color: var(--gold); }
+
+  button#go {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: var(--stamp);
+    color: #f2ead4;
+    border: none;
+    padding: 0 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  button#go:hover { transform: translateY(-1px); }
+  button#go:active { transform: translateY(0); }
+
+  .suggest {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 96px;
+    background: #fff;
+    border: 1px solid var(--card-line);
+    border-radius: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 5;
+    box-shadow: 0 10px 20px -8px rgba(0,0,0,0.25);
+    display: none;
+  }
+  .suggest.open { display: block; }
+  .suggest div {
+    padding: 9px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #efe6cf;
+  }
+  .suggest div:last-child { border-bottom: none; }
+  .suggest div:hover { background: var(--stamp-soft); }
+
+  .hint {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Status / empty states ────────────────────────────────────── */
+
+  .status {
+    margin-top: 40px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+  .status.error { color: var(--stamp); }
+
+  /* ── Results: fanned index cards ──────────────────────────────── */
+
+  .results-head {
+    margin: 46px 0 18px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .results-head h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 20px;
+    margin: 0;
+  }
+  .results-head span {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.08em;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--card);
+    border-radius: 3px;
+    padding: 20px 18px 18px;
+    box-shadow: 0 10px 22px -14px rgba(0,0,0,0.5), 0 1px 0 rgba(0,0,0,0.05);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 27px,
+      var(--card-line) 28px
+    );
+    opacity: 0;
+    transform: translateY(10px);
+    animation: rise 0.45s ease forwards;
+  }
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 14px; left: 14px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--paper);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.35);
+  }
+
+  .card-index {
+    position: absolute;
+    top: 16px; left: 36px;
+    font-size: 10px;
+    color: var(--ink-soft);
+    letter-spacing: 0.1em;
+  }
+
+  .stamp {
+    position: absolute;
+    top: 12px; right: 10px;
+    border: 2px solid var(--stamp);
+    color: var(--stamp);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    transform: rotate(6deg);
+    opacity: 0.88;
+    background: rgba(255,255,255,0.4);
+    white-space: nowrap;
+  }
+
+  .card h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin: 30px 0 2px;
+    line-height: 1.25;
+  }
+
+  .card .artist {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .tag {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tab);
+    border: 1px solid var(--tab);
+    padding: 2px 7px;
+    border-radius: 20px;
+    opacity: 0.85;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 70px;
+    font-size: 11px;
+    color: var(--ink-soft);
+    opacity: 0.8;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card { animation: none; opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">A Personal Library, Cross&#8209;Referenced</div>
+      <h1>The Catalog</h1>
+      <p>Type in an album you already like. I'll pull the closest matches from my own shelves — same tags, same collaborators, same era.</p>
+    </header>
+
+    <div class="drawer">
+      <div class="drawer-label">Drawer — Search by Title</div>
+      <div class="drawer-face">
+        <div class="search-row">
+          <input id="search" type="text" placeholder="e.g. In Rainbows" autocomplete="off" />
+          <button id="go">File a request</button>
+          <div id="suggest" class="suggest"></div>
+        </div>
+        <div class="hint">Start typing for a card index of everything in the library.</div>
+      </div>
+    </div>
+
+    <div id="status" class="status" style="display:none;"></div>
+
+    <div id="resultsSection" style="display:none;">
+      <div class="results-head">
+        <h2 id="resultsTitle">Cross-references for &ndash;</h2>
+        <span id="resultsCount"></span>
+      </div>
+      <div class="cards" id="cards"></div>
+    </div>
+
+    <footer>Recommendations pulled live from a hand-curated album library.</footer>
+  </div>
+
+<script>
+  // Point this at your deployed FastAPI backend.
+  const API_BASE = window.ALBUM_API_BASE || "http://localhost:8000";
+
+  const searchInput = document.getElementById('search');
+  const suggestBox = document.getElementById('suggest');
+  const goBtn = document.getElementById('go');
+  const statusEl = document.getElementById('status');
+  const resultsSection = document.getElementById('resultsSection');
+  const resultsTitle = document.getElementById('resultsTitle');
+  const resultsCount = document.getElementById('resultsCount');
+  const cardsEl = document.getElementById('cards');
+
+  let allTitles = [];
+
+  async function loadTitles() {
+    try {
+      const res = await fetch(`${API_BASE}/api/albums`);
+      const data = await res.json();
+      allTitles = data.titles || [];
+    } catch (e) {
+      console.error('Could not load album list', e);
+    }
+  }
+
+  function showSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { suggestBox.classList.remove('open'); return; }
+    const matches = allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { suggestBox.classList.remove('open'); return; }
+    suggestBox.innerHTML = matches.map(t => `<div data-title="${t.replace(/"/g,'&quot;')}">${t}</div>`).join('');
+    suggestBox.classList.add('open');
+  }
+
+  suggestBox.addEventListener('click', (e) => {
+    const t = e.target.getAttribute('data-title');
+    if (t) {
+      searchInput.value = t;
+      suggestBox.classList.remove('open');
+      runSearch();
+    }
+  });
+
+  searchInput.addEventListener('input', () => showSuggestions(searchInput.value));
+  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-row')) suggestBox.classList.remove('open');
+  });
+  goBtn.addEventListener('click', runSearch);
+
+  function setStatus(msg, isError = false) {
+    statusEl.style.display = msg ? 'block' : 'none';
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('error', isError);
+  }
+
+  async function runSearch() {
+    const title = searchInput.value.trim();
+    if (!title) return;
+    suggestBox.classList.remove('open');
+    resultsSection.style.display = 'none';
+    setStatus('Pulling the card for "' + title + '" …');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/recommend?title=${encodeURIComponent(title)}&n=6`);
+      if (!res.ok) throw new Error('Request failed');
+      const data = await res.json();
+
+      if (!data.results || !data.results.length) {
+        if (data.suggestions && data.suggestions.length) {
+          setStatus(`Not in the library yet. Did you mean: ${data.suggestions.join(', ')}?`, true);
+        } else {
+          setStatus(`"${title}" isn't in the library yet.`, true);
+        }
+        return;
+      }
+
+      setStatus('');
+      renderResults(data);
+    } catch (e) {
+      console.error(e);
+      setStatus('Could not reach the catalog right now — try again shortly.', true);
+    }
+  }
+
+  function renderResults(data) {
+    resultsTitle.textContent = `Cross-references for "${data.matched_title}"`;
+    resultsCount.textContent = `${data.results.length} matches`;
+    cardsEl.innerHTML = data.results.map((r, i) => `
+      <div class="card" style="animation-delay:${i * 60}ms">
+        <div class="card-index">No. ${String(i + 1).padStart(2, '0')}</div>
+        <div class="stamp">${Math.round(r.similarity * 100)}% match</div>
+        <h3>${escapeHtml(r.title)}</h3>
+        <div class="artist">${escapeHtml(r.artist_names || 'Unknown artist')}</div>
+        <div class="meta-row">
+          <span>${r.release_year || '—'}</span>
+          <span>${r.rating ? 'My rating: ' + r.rating : ''}</span>
+        </div>
+        <div class="tags">
+          ${(r.tags || []).slice(0, 5).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
+        </div>
+      </div>
+    `).join('');
+    resultsSection.style.display = 'block';
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  loadTitles();
+</script>
+</body>
+</html>
